@@ -1,0 +1,256 @@
+package nats
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"time"
+
+	"review-service/config"
+	eventbroker "review-service/internal/presentation/event_broker"
+	"review-service/internal/presentation/event_broker/nats/pullplan"
+
+	"github.com/nats-io/nats.go"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
+	"github.com/ofm-microservices/ofm-common/pkg/observability/natstrace"
+)
+
+type pullConsumerRuntimeFactory struct{}
+
+type pullConsumerRuntime struct {
+	sub      *nats.Subscription
+	log      logging.Logger
+	cfg      config.PullConsumerConfig
+	handler  eventbroker.MessageHandler
+	resolver pullplan.Resolver
+	jobs     chan *nats.Msg
+}
+
+type pullConsumerFetchState struct {
+	batch             int
+	wait              time.Duration
+	tier              string
+	lastAdaptiveCheck time.Time
+}
+
+func NewPullConsumerRuntimeFactory() PullConsumerRuntimeFactory {
+	return &pullConsumerRuntimeFactory{}
+}
+
+func (f *pullConsumerRuntimeFactory) Create(
+	nc *nats.Conn,
+	log logging.Logger,
+	cfg config.PullConsumerConfig,
+	handler eventbroker.MessageHandler,
+) (PullConsumerRuntime, error) {
+	js, err := nc.JetStream()
+	if err != nil {
+		return nil, AnnotateInitJetStreamContextError(err)
+	}
+
+	consumerCfg := &nats.ConsumerConfig{
+		Durable:       cfg.Durable,
+		FilterSubject: cfg.Subject,
+		AckPolicy:     nats.AckExplicitPolicy,
+		AckWait:       cfg.AckWait,
+		MaxDeliver:    cfg.MaxDeliver,
+	}
+	switch cfg.DeliverPolicy {
+	case "new":
+		consumerCfg.DeliverPolicy = nats.DeliverNewPolicy
+	case "last":
+		consumerCfg.DeliverPolicy = nats.DeliverLastPolicy
+	default:
+		consumerCfg.DeliverPolicy = nats.DeliverAllPolicy
+	}
+
+	if _, err := js.AddConsumer(cfg.Stream, consumerCfg); err != nil {
+		if _, updateErr := js.UpdateConsumer(cfg.Stream, consumerCfg); updateErr != nil {
+			return nil, AnnotateEnsureConsumerError(cfg.Stream, cfg.Durable, err, updateErr)
+		}
+	}
+
+	sub, err := js.PullSubscribe(
+		cfg.Subject,
+		cfg.Durable,
+		nats.BindStream(cfg.Stream),
+		nats.ManualAck(),
+	)
+	if err != nil {
+		return nil, AnnotateCreatePullSubscriberError(cfg.Subject, cfg.Durable, err)
+	}
+
+	return &pullConsumerRuntime{
+		sub:      sub,
+		log:      log,
+		cfg:      cfg,
+		handler:  handler,
+		resolver: pullplan.New(),
+		jobs:     make(chan *nats.Msg, cfg.QueueSize),
+	}, nil
+}
+
+func (r *pullConsumerRuntime) Start(ctx context.Context) {
+	var wg sync.WaitGroup
+
+	for i := 0; i < r.cfg.Workers; i++ {
+		wg.Add(1)
+		workerID := i + 1
+		go r.RunWorker(ctx, &wg, workerID)
+	}
+
+	go r.RunFetcher(ctx, &wg)
+}
+
+func (r *pullConsumerRuntime) RunWorker(ctx context.Context, wg *sync.WaitGroup, workerID int) {
+	defer wg.Done()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-r.jobs:
+			if !ok {
+				return
+			}
+
+			metrics.Global().IncNATSReceived(r.cfg.Stream, msg.Subject, r.cfg.Durable)
+			started := time.Now()
+			msgCtx := natstrace.ContextFromMessage(ctx, msg)
+			if err := r.handler(msgCtx, msg.Subject, msg.Data); err != nil {
+				metrics.Global().ObserveNATSProcessed(r.cfg.Stream, msg.Subject, r.cfg.Durable, "error", time.Since(started))
+				r.log.Error("message handler failed",
+					logging.String("subject", msg.Subject),
+					logging.Int("worker_id", workerID),
+					logging.Err(err),
+				)
+				_ = msg.Nak()
+				metrics.Global().IncNATSNak(r.cfg.Stream, msg.Subject, r.cfg.Durable)
+				continue
+			}
+
+			metrics.Global().ObserveNATSProcessed(r.cfg.Stream, msg.Subject, r.cfg.Durable, "success", time.Since(started))
+			if err := msg.Ack(); err != nil {
+				r.log.Error("message ack failed",
+					logging.String("subject", msg.Subject),
+					logging.Int("worker_id", workerID),
+					logging.Err(err),
+				)
+				metrics.Global().IncNATSNak(r.cfg.Stream, msg.Subject, r.cfg.Durable)
+			} else {
+				metrics.Global().IncNATSAck(r.cfg.Stream, msg.Subject, r.cfg.Durable)
+			}
+		}
+	}
+}
+
+func (r *pullConsumerRuntime) RunFetcher(ctx context.Context, wg *sync.WaitGroup) {
+	defer close(r.jobs)
+	defer wg.Wait()
+
+	state := pullConsumerFetchState{
+		batch:             r.cfg.BatchSize,
+		wait:              r.cfg.MaxWait,
+		tier:              "base",
+		lastAdaptiveCheck: time.Now(),
+	}
+
+	for {
+		if r.ShouldStop(ctx) {
+			return
+		}
+
+		r.MaybeUpdateAdaptivePlan(&state)
+
+		msgs, err := r.sub.Fetch(state.batch, nats.MaxWait(state.wait))
+		if r.HandleFetchError(err) {
+			continue
+		}
+
+		if r.DispatchFetchedMessages(ctx, msgs) {
+			return
+		}
+	}
+}
+
+func (r *pullConsumerRuntime) ShouldStop(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		r.log.Info("pull consumer stopped",
+			logging.String("subject", r.cfg.Subject),
+			logging.String("durable", r.cfg.Durable),
+		)
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *pullConsumerRuntime) MaybeUpdateAdaptivePlan(state *pullConsumerFetchState) {
+	if !r.cfg.Adaptive.Enabled || time.Since(state.lastAdaptiveCheck) < r.cfg.Adaptive.CheckInterval {
+		return
+	}
+
+	state.lastAdaptiveCheck = time.Now()
+
+	info, err := r.sub.ConsumerInfo()
+	if err != nil {
+		r.log.Warn("adaptive check failed",
+			logging.String("subject", r.cfg.Subject),
+			logging.String("durable", r.cfg.Durable),
+			logging.Err(err),
+		)
+		return
+	}
+	metrics.Global().SetNATSPending(r.cfg.Stream, r.cfg.Subject, r.cfg.Durable, int(info.NumPending))
+
+	nextTier, nextBatch, nextWait := r.resolver.Resolve(r.cfg, int(info.NumPending))
+	if nextTier == state.tier && nextBatch == state.batch && nextWait == state.wait {
+		return
+	}
+
+	state.tier = nextTier
+	state.batch = nextBatch
+	state.wait = nextWait
+	metrics.Global().SetNATSBatchSize(r.cfg.Stream, r.cfg.Subject, r.cfg.Durable, state.batch)
+
+	r.log.Info("adaptive pull plan switched",
+		logging.String("subject", r.cfg.Subject),
+		logging.String("durable", r.cfg.Durable),
+		logging.String("tier", state.tier),
+		logging.Int("pending", int(info.NumPending)),
+		logging.Int("batch_size", state.batch),
+		logging.Any("max_wait", state.wait),
+	)
+}
+
+func (r *pullConsumerRuntime) HandleFetchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, nats.ErrTimeout) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	r.log.Error("pull consumer fetch failed",
+		logging.String("subject", r.cfg.Subject),
+		logging.String("durable", r.cfg.Durable),
+		logging.Err(err),
+	)
+	metrics.Global().IncNATSFetchError(r.cfg.Stream, r.cfg.Subject, r.cfg.Durable)
+	time.Sleep(250 * time.Millisecond)
+	return true
+}
+
+func (r *pullConsumerRuntime) DispatchFetchedMessages(ctx context.Context, msgs []*nats.Msg) bool {
+	for _, msg := range msgs {
+		select {
+		case <-ctx.Done():
+			return true
+		case r.jobs <- msg:
+		}
+	}
+
+	return false
+}
