@@ -67,6 +67,14 @@ func (s *reviewService) GetUserRatingSummaryByUsername(ctx context.Context, user
 	if sellerID == "" {
 		return nil, domain.ErrInvalidUsername
 	}
+	if err := s.readRepo.SetSellerIDByUsername(ctx, username, sellerID); err != nil {
+		s.log.Error("seller username id cache seed failed",
+			logging.Operation("review.rating.cache_seed"),
+			logging.String("username", username),
+			logging.String("seller_id", sellerID),
+			logging.Err(err),
+		)
+	}
 
 	summary, err = s.repo.GetSellerRatingSummary(ctx, sellerID)
 	if err != nil {

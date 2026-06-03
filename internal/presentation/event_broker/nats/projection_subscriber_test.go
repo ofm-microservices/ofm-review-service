@@ -32,6 +32,9 @@ func (s *projectionSvcStub) ListGigReviews(context.Context, app.ListGigReviewsQu
 func (s *projectionSvcStub) ListSellerReviews(context.Context, app.ListSellerReviewsQuery) (*domain.ListReviewsResult, error) {
 	return nil, errors.New("unexpected call")
 }
+func (s *projectionSvcStub) GetReviewsBySellerUsername(context.Context, string, string) (*domain.ListReviewsResult, error) {
+	return nil, errors.New("unexpected call")
+}
 func (s *projectionSvcStub) GetGigRatingSummary(context.Context, string) (*domain.RatingSummary, error) {
 	s.gigSummaryCalls++
 	if s.gigSummary != nil {
@@ -91,6 +94,9 @@ func (r *projectionReadStub) GetSellerRatingSummaryByUsername(context.Context, s
 	}
 	return nil, domain.ErrReviewNotFound
 }
+func (r *projectionReadStub) GetSellerIDByUsername(context.Context, string) (string, error) {
+	return "", domain.ErrReviewNotFound
+}
 func (r *projectionReadStub) SetGigRating(context.Context, string, domain.RatingSummary) error {
 	return nil
 }
@@ -98,6 +104,9 @@ func (r *projectionReadStub) SetSellerRating(context.Context, string, domain.Rat
 	return nil
 }
 func (r *projectionReadStub) SetSellerRatingByUsername(context.Context, string, domain.RatingSummary) error {
+	return nil
+}
+func (r *projectionReadStub) SetSellerIDByUsername(context.Context, string, string) error {
 	return nil
 }
 func (r *projectionReadStub) ListByGigID(context.Context, domain.ListReviewsQuery) (*domain.ListReviewsResult, error) {

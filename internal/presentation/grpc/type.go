@@ -17,6 +17,7 @@ type ReviewService interface {
 	CreateReview(ctx context.Context, cmd app.CreateReviewCommand) (*domain.Review, error)
 	ListGigReviews(ctx context.Context, query app.ListGigReviewsQuery) (*domain.ListReviewsResult, error)
 	ListSellerReviews(ctx context.Context, query app.ListSellerReviewsQuery) (*domain.ListReviewsResult, error)
+	GetReviewsBySellerUsername(ctx context.Context, username, cursor string) (*domain.ListReviewsResult, error)
 	GetGigRatingSummary(ctx context.Context, gigID string) (*domain.RatingSummary, error)
 	GetUserRatingSummaryByUsername(ctx context.Context, username string) (*domain.RatingSummary, error)
 }

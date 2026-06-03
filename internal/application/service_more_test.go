@@ -58,6 +58,9 @@ func (r *createReviewRepoStub) ListByGigID(context.Context, domain.ListReviewsQu
 func (r *createReviewRepoStub) ListBySellerID(context.Context, domain.ListReviewsQuery) (*domain.ListReviewsResult, error) {
 	return nil, errors.New("unexpected call")
 }
+func (r *createReviewRepoStub) GetSellerIDByUsername(context.Context, string) (string, error) {
+	return "", domain.ErrReviewNotFound
+}
 
 func (r *createReviewRepoStub) GetGigRatingSummary(context.Context, string) (*domain.RatingSummary, error) {
 	return nil, errors.New("unexpected call")

@@ -84,6 +84,7 @@ func (s *server) CreateReview(ctx context.Context, req *reviewv1.CreateReviewReq
 	res, err := s.svc.CreateReview(ctx, app.CreateReviewCommand{
 		OrderID:        req.GetOrderId(),
 		BuyerID:        req.GetBuyerUserId(),
+		BuyerUsername:  req.GetBuyerUsername(),
 		Content:        req.GetContent(),
 		Rating:         req.GetRating(),
 		IdempotencyKey: req.GetIdempotencyKey(),
@@ -97,6 +98,7 @@ func (s *server) CreateReview(ctx context.Context, req *reviewv1.CreateReviewReq
 			logging.DurationMS(time.Since(started)),
 			logging.String("order_id", req.GetOrderId()),
 			logging.String("buyer_id", req.GetBuyerUserId()),
+			logging.String("buyer_username", req.GetBuyerUsername()),
 			logging.Err(err),
 		)
 		switch {
@@ -169,6 +171,36 @@ func (s *server) ListSellerReviews(ctx context.Context, req *reviewv1.ListSeller
 			logging.Err(err),
 		)
 		if errors.Is(err, domain.ErrInvalidSellerID) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, "internal server error")
+	}
+
+	reviews := make([]*reviewv1.Review, 0, len(res.Reviews))
+	for _, review := range res.Reviews {
+		reviews = append(reviews, s.mapper.ToProto(review))
+	}
+	return &reviewv1.ListSellerReviewsResponse{
+		Reviews: reviews,
+		Cursor:  res.Cursor,
+		HasMore: res.HasMore,
+	}, nil
+}
+
+func (s *server) GetReviewsBySellerUsername(ctx context.Context, req *reviewv1.GetReviewsBySellerUsernameRequest) (*reviewv1.ListSellerReviewsResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	res, err := s.svc.GetReviewsBySellerUsername(ctx, req.GetUsername(), req.GetCursor())
+	if err != nil {
+		log.Error("get reviews by seller username failed",
+			logging.Operation("grpc.review.get_reviews_by_seller_username"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("username", req.GetUsername()),
+			logging.Err(err),
+		)
+		if errors.Is(err, domain.ErrInvalidUsername) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		return nil, status.Error(codes.Internal, "internal server error")

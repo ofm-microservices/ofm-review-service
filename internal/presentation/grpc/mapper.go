@@ -25,13 +25,14 @@ func (reviewMapper) ToProto(review *domain.Review) *reviewv1.Review {
 		return nil
 	}
 	out := &reviewv1.Review{
-		ReviewId:    review.ID,
-		OrderId:     review.OrderID,
-		GigId:       review.GigID,
-		BuyerUserId: review.BuyerID,
-		Content:     review.Content,
-		Rating:      review.Rating,
-		CreatedAt:   review.CreatedAt.UTC().Format(time.RFC3339Nano),
+		ReviewId:       review.ID,
+		OrderId:        review.OrderID,
+		GigId:          review.GigID,
+		BuyerUserId:    review.BuyerID,
+		Content:        review.Content,
+		Rating:         review.Rating,
+		CreatedAt:      review.CreatedAt.UTC().Format(time.RFC3339Nano),
+		SellerUsername: review.SellerUsername,
 	}
 	if review.Author != nil {
 		out.Author = &reviewv1.ReviewAuthor{
