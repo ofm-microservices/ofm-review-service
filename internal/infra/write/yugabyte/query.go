@@ -2,25 +2,32 @@ package repository
 
 const (
 	insertReviewQuery = `
-		INSERT INTO reviews (review_id, order_id, gig_id, content, buyer_id, seller_id, rating)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING review_id, order_id, gig_id, content, buyer_id, seller_id, rating, created_at, updated_at
+		INSERT INTO reviews (review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating, created_at, updated_at
 	`
 
 	selectReviewByIDQuery = `
-		SELECT review_id, order_id, gig_id, content, buyer_id, seller_id, rating, created_at, updated_at
+		SELECT review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating, created_at, updated_at
 		FROM reviews
 		WHERE review_id = $1
 	`
 
 	selectReviewByOrderIDQuery = `
-		SELECT review_id, order_id, gig_id, content, buyer_id, seller_id, rating, created_at, updated_at
+		SELECT review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating, created_at, updated_at
 		FROM reviews
 		WHERE order_id = $1
 	`
 
+	selectSellerIDByUsernameQuery = `
+		SELECT seller_id
+		FROM reviews
+		WHERE seller_username = $1
+		LIMIT 1
+	`
+
 	selectReviewsByGigIDQuery = `
-		SELECT review_id, order_id, gig_id, content, buyer_id, seller_id, rating, created_at, updated_at
+		SELECT review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating, created_at, updated_at
 		FROM reviews
 		WHERE gig_id = $1
 		ORDER BY created_at DESC, review_id DESC
@@ -28,7 +35,7 @@ const (
 	`
 
 	selectReviewsByGigIDCursorQuery = `
-		SELECT review_id, order_id, gig_id, content, buyer_id, seller_id, rating, created_at, updated_at
+		SELECT review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating, created_at, updated_at
 		FROM reviews
 		WHERE gig_id = $1
 		  AND (created_at, review_id) < ($2, $3)
@@ -37,7 +44,7 @@ const (
 	`
 
 	selectReviewsBySellerIDQuery = `
-		SELECT review_id, order_id, gig_id, content, buyer_id, seller_id, rating, created_at, updated_at
+		SELECT review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating, created_at, updated_at
 		FROM reviews
 		WHERE seller_id = $1
 		ORDER BY created_at DESC, review_id DESC
@@ -45,7 +52,7 @@ const (
 	`
 
 	selectReviewsBySellerIDCursorQuery = `
-		SELECT review_id, order_id, gig_id, content, buyer_id, seller_id, rating, created_at, updated_at
+		SELECT review_id, order_id, gig_id, content, buyer_id, buyer_username, seller_id, seller_username, rating, created_at, updated_at
 		FROM reviews
 		WHERE seller_id = $1
 		  AND (created_at, review_id) < ($2, $3)

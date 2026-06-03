@@ -2,13 +2,15 @@ package model
 
 // ReviewCache is the Redis projection model for the review read model.
 type ReviewCache struct {
-	ID        string  `json:"review_id"`
-	GigID     string  `json:"gig_id"`
-	Content   string  `json:"content"`
-	BuyerID   string  `json:"buyer_id"`
-	Rating    int32   `json:"rating"`
-	Author    *Author `json:"author,omitempty"`
-	CreatedAt string  `json:"created_at"`
+	ID             string  `json:"review_id"`
+	GigID          string  `json:"gig_id"`
+	Content        string  `json:"content"`
+	BuyerID        string  `json:"buyer_id"`
+	BuyerUsername  string  `json:"buyer_username,omitempty"`
+	SellerUsername string  `json:"seller_username,omitempty"`
+	Rating         int32   `json:"rating"`
+	Author         *Author `json:"author,omitempty"`
+	CreatedAt      string  `json:"created_at"`
 }
 
 // Author is the cached review author preview.

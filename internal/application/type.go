@@ -14,6 +14,7 @@ type ReviewService interface {
 	CreateReview(ctx context.Context, cmd CreateReviewCommand) (*domain.Review, error)
 	ListGigReviews(ctx context.Context, query ListGigReviewsQuery) (*domain.ListReviewsResult, error)
 	ListSellerReviews(ctx context.Context, query ListSellerReviewsQuery) (*domain.ListReviewsResult, error)
+	GetReviewsBySellerUsername(ctx context.Context, username, cursor string) (*domain.ListReviewsResult, error)
 	GetGigRatingSummary(ctx context.Context, gigID string) (*domain.RatingSummary, error)
 	GetUserRatingSummaryByUsername(ctx context.Context, username string) (*domain.RatingSummary, error)
 	ProjectReview(ctx context.Context, review *domain.Review, policy ProjectionPolicy) (*ProjectionResult, error)
@@ -82,11 +83,12 @@ type WindowCoordinatorConfig struct {
 // OrderLifecycleSnapshot carries the order state required to validate and
 // enrich a review write.
 type OrderLifecycleSnapshot struct {
-	OrderID  string
-	BuyerID  string
-	GigID    string
-	SellerID string
-	Status   string
+	OrderID        string
+	BuyerID        string
+	GigID          string
+	SellerID       string
+	SellerUsername string
+	Status         string
 }
 
 // UserPreview carries the preview data needed for read-model enrichment.
@@ -102,6 +104,7 @@ type UserPreview struct {
 type CreateReviewCommand struct {
 	OrderID        string
 	BuyerID        string
+	BuyerUsername  string
 	Content        string
 	Rating         int32
 	IdempotencyKey string

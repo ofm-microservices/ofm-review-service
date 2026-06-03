@@ -10,12 +10,13 @@ import (
 // MapDomainReviewToCache maps the domain review into its Redis projection model.
 func MapDomainReviewToCache(review *domain.Review) model.ReviewCache {
 	out := model.ReviewCache{
-		ID:        review.ID,
-		GigID:     review.GigID,
-		Content:   review.Content,
-		BuyerID:   review.BuyerID,
-		Rating:    review.Rating,
-		CreatedAt: review.CreatedAt.UTC().Format(time.RFC3339Nano),
+		ID:            review.ID,
+		GigID:         review.GigID,
+		Content:       review.Content,
+		BuyerID:       review.BuyerID,
+		BuyerUsername: review.BuyerUsername,
+		Rating:        review.Rating,
+		CreatedAt:     review.CreatedAt.UTC().Format(time.RFC3339Nano),
 	}
 	if review.Author != nil {
 		out.Author = &model.Author{
