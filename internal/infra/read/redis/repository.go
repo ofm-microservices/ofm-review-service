@@ -599,11 +599,17 @@ func (r *repo) RemoveActiveQueueIfEmpty(ctx context.Context, activeKey, queueKey
 
 // TryAcquireLease acquires the owner lease with SET NX PX.
 func (r *repo) TryAcquireLease(ctx context.Context, leaseKey, token string, ttl time.Duration) (bool, error) {
-	ok, err := r.rdb.SetNX(ctx, leaseKey, token, ttl).Result()
-	if err != nil {
+	cmd := r.rdb.SetArgs(ctx, leaseKey, token, redis.SetArgs{
+		Mode: "NX",
+		TTL:  ttl,
+	})
+	if err := cmd.Err(); err != nil {
+		if err == redis.Nil {
+			return false, nil
+		}
 		return false, AnnotateLeaseReviewError(leaseKey, err)
 	}
-	return ok, nil
+	return cmd.Val() == "OK", nil
 }
 
 // RenewLease extends the owner lease only if the caller still owns it.
