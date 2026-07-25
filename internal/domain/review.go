@@ -30,16 +30,18 @@ type SellerRatingSummary struct {
 
 // Review is the write-model entity owned by review-service.
 type Review struct {
-	ID        string        `json:"review_id"`
-	OrderID   string        `json:"order_id"`
-	GigID     string        `json:"gig_id"`
-	Content   string        `json:"content"`
-	BuyerID   string        `json:"buyer_id"`
-	Rating    int32         `json:"rating"`
-	SellerID  string        `json:"seller_id"`
-	Author    *ReviewAuthor `json:"author,omitempty"`
-	CreatedAt time.Time     `json:"created_at"`
-	UpdatedAt time.Time     `json:"updated_at"`
+	ID             string        `json:"review_id"`
+	OrderID        string        `json:"order_id"`
+	GigID          string        `json:"gig_id"`
+	Content        string        `json:"content"`
+	BuyerID        string        `json:"buyer_id"`
+	BuyerUsername  string        `json:"buyer_username,omitempty"`
+	Rating         int32         `json:"rating"`
+	SellerID       string        `json:"seller_id"`
+	SellerUsername string        `json:"seller_username"`
+	Author         *ReviewAuthor `json:"author,omitempty"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
 }
 
 // ReviewAuthor carries the author preview projected into Redis.
@@ -53,13 +55,15 @@ type ReviewAuthor struct {
 
 // CreateReviewParams contains the input required to create a new review.
 type CreateReviewParams struct {
-	ID       string
-	OrderID  string
-	GigID    string
-	Content  string
-	BuyerID  string
-	SellerID string
-	Rating   int32
+	ID             string
+	OrderID        string
+	GigID          string
+	Content        string
+	BuyerID        string
+	BuyerUsername  string
+	SellerID       string
+	SellerUsername string
+	Rating         int32
 }
 
 // ReviewRepository persists the review-service write model.
@@ -67,6 +71,7 @@ type ReviewRepository interface {
 	Create(ctx context.Context, params CreateReviewParams) (*Review, error)
 	GetByID(ctx context.Context, reviewID string) (*Review, error)
 	GetByOrderID(ctx context.Context, orderID string) (*Review, error)
+	GetSellerIDByUsername(ctx context.Context, username string) (string, error)
 	ListByGigID(ctx context.Context, query ListReviewsQuery) (*ListReviewsResult, error)
 	ListBySellerID(ctx context.Context, query ListReviewsQuery) (*ListReviewsResult, error)
 	GetGigRatingSummary(ctx context.Context, gigID string) (*RatingSummary, error)
@@ -81,9 +86,11 @@ type ReviewReadRepository interface {
 	UpsertGigRating(ctx context.Context, gigID string, rating int32) error
 	UpsertSellerRating(ctx context.Context, sellerID string, rating int32) error
 	UpsertSellerRatingByUsername(ctx context.Context, username string, rating int32) error
+	GetSellerIDByUsername(ctx context.Context, username string) (string, error)
 	GetGigRatingSummary(ctx context.Context, gigID string) (*RatingSummary, error)
 	GetSellerRatingSummary(ctx context.Context, sellerID string) (*RatingSummary, error)
 	GetSellerRatingSummaryByUsername(ctx context.Context, username string) (*RatingSummary, error)
+	SetSellerIDByUsername(ctx context.Context, username, sellerID string) error
 	SetGigRating(ctx context.Context, gigID string, summary RatingSummary) error
 	SetSellerRating(ctx context.Context, sellerID string, summary RatingSummary) error
 	SetSellerRatingByUsername(ctx context.Context, username string, summary RatingSummary) error

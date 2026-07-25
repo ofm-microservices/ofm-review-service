@@ -31,6 +31,9 @@ func (s seedSourceStub) ListByGigID(context.Context, domain.ListReviewsQuery) (*
 func (s seedSourceStub) ListBySellerID(context.Context, domain.ListReviewsQuery) (*domain.ListReviewsResult, error) {
 	return s.sellerResult, s.sellerErr
 }
+func (s seedSourceStub) GetSellerIDByUsername(context.Context, string) (string, error) {
+	return "", domain.ErrReviewNotFound
+}
 func (s seedSourceStub) GetGigRatingSummary(context.Context, string) (*domain.RatingSummary, error) {
 	return nil, errors.New("unexpected call")
 }
@@ -60,6 +63,9 @@ func (p *seedProjectorStub) ListGigReviews(context.Context, ListGigReviewsQuery)
 	return nil, errors.New("unexpected call")
 }
 func (p *seedProjectorStub) ListSellerReviews(context.Context, ListSellerReviewsQuery) (*domain.ListReviewsResult, error) {
+	return nil, errors.New("unexpected call")
+}
+func (p *seedProjectorStub) GetReviewsBySellerUsername(context.Context, string, string) (*domain.ListReviewsResult, error) {
 	return nil, errors.New("unexpected call")
 }
 func (p *seedProjectorStub) GetGigRatingSummary(context.Context, string) (*domain.RatingSummary, error) {

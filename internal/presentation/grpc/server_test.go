@@ -35,6 +35,9 @@ func (s *serverSvcStub) ListGigReviews(context.Context, app.ListGigReviewsQuery)
 func (s *serverSvcStub) ListSellerReviews(context.Context, app.ListSellerReviewsQuery) (*domain.ListReviewsResult, error) {
 	return s.listReviews, s.listErr
 }
+func (s *serverSvcStub) GetReviewsBySellerUsername(context.Context, string, string) (*domain.ListReviewsResult, error) {
+	return s.listReviews, s.listErr
+}
 func (s *serverSvcStub) GetGigRatingSummary(context.Context, string) (*domain.RatingSummary, error) {
 	return s.gigSummary, s.createErr
 }

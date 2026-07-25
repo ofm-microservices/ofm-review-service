@@ -93,6 +93,23 @@ func (r *repo) GetSellerRatingSummaryByUsername(ctx context.Context, username st
 	return r.getRatingSummary(ctx, SellerRatingByUsernameKey(username))
 }
 
+func (r *repo) GetSellerIDByUsername(ctx context.Context, username string) (string, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveRedis("get", "review", status, time.Since(started)) }()
+
+	key := SellerIDByUsernameKey(username)
+	raw, err := r.rdb.Get(ctx, key).Result()
+	if err != nil {
+		status = "error"
+		if err == redis.Nil {
+			return "", domain.ErrReviewNotFound
+		}
+		return "", AnnotateSetReviewCacheError(key, err)
+	}
+	return strings.TrimSpace(raw), nil
+}
+
 func (r *repo) SetGigRating(ctx context.Context, gigID string, summary domain.RatingSummary) error {
 	started := time.Now()
 	status := "success"
@@ -124,6 +141,23 @@ func (r *repo) SetSellerRatingByUsername(ctx context.Context, username string, s
 		return ErrInvalidCursor
 	}
 	return r.setRatingAggregate(ctx, SellerRatingByUsernameKey(username), summary)
+}
+
+func (r *repo) SetSellerIDByUsername(ctx context.Context, username, sellerID string) error {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveRedis("set", "review", status, time.Since(started)) }()
+
+	username = strings.TrimSpace(username)
+	sellerID = strings.TrimSpace(sellerID)
+	if username == "" || sellerID == "" {
+		return ErrInvalidCursor
+	}
+	if err := r.rdb.Set(ctx, SellerIDByUsernameKey(username), sellerID, 0).Err(); err != nil {
+		status = "error"
+		return AnnotateSetReviewCacheError(SellerIDByUsernameKey(username), err)
+	}
+	return nil
 }
 
 func (r *repo) UpsertGigWindow(ctx context.Context, gigID string, window int, reviews []*domain.Review, hasMore bool, ttl time.Duration) error {
@@ -217,6 +251,11 @@ func SellerRatingByUsernameKey(username string) string {
 	return fmt.Sprintf("seller:rating:username:%s", username)
 }
 
+// SellerIDByUsernameKey builds the cache key used for seller ID lookup by username.
+func SellerIDByUsernameKey(username string) string {
+	return fmt.Sprintf("user:%s", username)
+}
+
 func (r *repo) ReviewIndexMemberExists(ctx context.Context, key, reviewID string) (bool, error) {
 	_ = ctx
 	_ = key
@@ -303,12 +342,13 @@ func MapZSetMemberToDomain(member any, score float64) (*domain.Review, error) {
 		return nil, AnnotateUnmarshalReviewCacheError(err)
 	}
 	review := &domain.Review{
-		ID:        cache.ID,
-		GigID:     cache.GigID,
-		Content:   cache.Content,
-		BuyerID:   cache.BuyerID,
-		Rating:    cache.Rating,
-		CreatedAt: ParseReviewCreatedAt(cache.CreatedAt, score),
+		ID:             cache.ID,
+		GigID:          cache.GigID,
+		Content:        cache.Content,
+		BuyerID:        cache.BuyerID,
+		SellerUsername: cache.SellerUsername,
+		Rating:         cache.Rating,
+		CreatedAt:      ParseReviewCreatedAt(cache.CreatedAt, score),
 	}
 	if cache.Author != nil {
 		review.Author = &domain.ReviewAuthor{
@@ -559,11 +599,17 @@ func (r *repo) RemoveActiveQueueIfEmpty(ctx context.Context, activeKey, queueKey
 
 // TryAcquireLease acquires the owner lease with SET NX PX.
 func (r *repo) TryAcquireLease(ctx context.Context, leaseKey, token string, ttl time.Duration) (bool, error) {
-	ok, err := r.rdb.SetNX(ctx, leaseKey, token, ttl).Result()
-	if err != nil {
+	cmd := r.rdb.SetArgs(ctx, leaseKey, token, redis.SetArgs{
+		Mode: "NX",
+		TTL:  ttl,
+	})
+	if err := cmd.Err(); err != nil {
+		if err == redis.Nil {
+			return false, nil
+		}
 		return false, AnnotateLeaseReviewError(leaseKey, err)
 	}
-	return ok, nil
+	return cmd.Val() == "OK", nil
 }
 
 // RenewLease extends the owner lease only if the caller still owns it.

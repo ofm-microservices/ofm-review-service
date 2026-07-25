@@ -63,6 +63,7 @@ func New(repo domain.ReviewRepository, readRepo domain.ReviewReadRepository, ord
 func (s *reviewService) CreateReview(ctx context.Context, cmd CreateReviewCommand) (*domain.Review, error) {
 	orderID := strings.TrimSpace(cmd.OrderID)
 	buyerID := strings.TrimSpace(cmd.BuyerID)
+	buyerUsername := strings.TrimSpace(cmd.BuyerUsername)
 	content := strings.TrimSpace(cmd.Content)
 	if orderID == "" {
 		return nil, domain.ErrInvalidOrderID
@@ -94,24 +95,45 @@ func (s *reviewService) CreateReview(ctx context.Context, cmd CreateReviewComman
 		return nil, err
 	}
 
+	sellerUsername := strings.TrimSpace(snap.SellerUsername)
+	if sellerUsername == "" {
+		if preview, err := s.users.GetUserPreviewByIDNoCache(ctx, strings.TrimSpace(snap.SellerID)); err == nil && preview != nil {
+			sellerUsername = strings.TrimSpace(preview.Username)
+		}
+	}
+
 	reviewID, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
 	}
 	review, err := s.repo.Create(ctx, domain.CreateReviewParams{
-		ID:       reviewID.String(),
-		OrderID:  orderID,
-		GigID:    snap.GigID,
-		Content:  content,
-		BuyerID:  buyerID,
-		SellerID: snap.SellerID,
-		Rating:   cmd.Rating,
+		ID:             reviewID.String(),
+		OrderID:        orderID,
+		GigID:          snap.GigID,
+		Content:        content,
+		BuyerID:        buyerID,
+		BuyerUsername:  buyerUsername,
+		SellerID:       snap.SellerID,
+		SellerUsername: sellerUsername,
+		Rating:         cmd.Rating,
 	})
 	if err != nil {
 		return nil, err
 	}
 	review.SellerID = snap.SellerID
+	review.SellerUsername = sellerUsername
 	review.Author = nil
+
+	if sellerUsername != "" {
+		if err := s.readRepo.SetSellerIDByUsername(ctx, sellerUsername, review.SellerID); err != nil {
+			s.log.Error("seller username id cache seed failed",
+				logging.Operation("review.create"),
+				logging.String("seller_username", sellerUsername),
+				logging.String("seller_id", review.SellerID),
+				logging.Err(err),
+			)
+		}
+	}
 
 	if err := s.pub.PublishGigReviewProjectionRequested(ctx, review); err != nil {
 		s.log.Error("review gig projection request publish failed",
@@ -149,6 +171,7 @@ func (s *reviewService) CreateReview(ctx context.Context, cmd CreateReviewComman
 		logging.Operation("review.create"),
 		logging.String("review_id", review.ID),
 		logging.String("order_id", review.OrderID),
+		logging.String("gig_id", review.GigID),
 	)
 	return review, nil
 }
@@ -167,6 +190,35 @@ func (s *reviewService) ListSellerReviews(ctx context.Context, query ListSellerR
 		return nil, domain.ErrInvalidSellerID
 	}
 	return s.ListSellerReviewsByCursor(ctx, sellerID, strings.TrimSpace(query.Cursor))
+}
+
+func (s *reviewService) GetReviewsBySellerUsername(ctx context.Context, username, cursor string) (*domain.ListReviewsResult, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, domain.ErrInvalidUsername
+	}
+
+	sellerID, err := s.readRepo.GetSellerIDByUsername(ctx, username)
+	if err == nil {
+		return s.ListSellerReviewsByCursor(ctx, sellerID, strings.TrimSpace(cursor))
+	}
+	if !errors.Is(err, domain.ErrReviewNotFound) {
+		return nil, err
+	}
+
+	sellerID, err = s.repo.GetSellerIDByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.readRepo.SetSellerIDByUsername(ctx, username, sellerID); err != nil {
+		s.log.Error("seller username id cache seed failed",
+			logging.Operation("review.username.cache_seed"),
+			logging.String("username", username),
+			logging.String("seller_id", sellerID),
+			logging.Err(err),
+		)
+	}
+	return s.ListSellerReviewsByCursor(ctx, sellerID, strings.TrimSpace(cursor))
 }
 
 func (s *reviewService) ProjectReview(ctx context.Context, review *domain.Review, policy ProjectionPolicy) (*ProjectionResult, error) {

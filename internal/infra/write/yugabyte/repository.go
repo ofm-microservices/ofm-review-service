@@ -50,14 +50,14 @@ func (r *repo) Create(ctx context.Context, params domain.CreateReviewParams) (*d
 	defer func() { _ = tx.Rollback() }()
 
 	var existing model.ReviewRow
-	if err := tx.QueryRowContext(ctx, selectReviewByOrderIDQuery, params.OrderID).Scan(&existing.ID, &existing.OrderID, &existing.GigID, &existing.Content, &existing.BuyerID, &existing.SellerID, &existing.Rating, &existing.CreatedAt, &existing.UpdatedAt); err == nil {
+	if err := tx.QueryRowContext(ctx, selectReviewByOrderIDQuery, params.OrderID).Scan(&existing.ID, &existing.OrderID, &existing.GigID, &existing.Content, &existing.BuyerID, &existing.BuyerUsername, &existing.SellerID, &existing.SellerUsername, &existing.Rating, &existing.CreatedAt, &existing.UpdatedAt); err == nil {
 		_ = tx.Commit()
 		return mapper.MapReviewRowToDomain(existing), nil
 	}
 
 	now := time.Now().UTC()
 	var row model.ReviewRow
-	if err := tx.QueryRowContext(ctx, insertReviewQuery, params.ID, params.OrderID, params.GigID, params.Content, params.BuyerID, params.SellerID, params.Rating).Scan(&row.ID, &row.OrderID, &row.GigID, &row.Content, &row.BuyerID, &row.SellerID, &row.Rating, &row.CreatedAt, &row.UpdatedAt); err != nil {
+	if err := tx.QueryRowContext(ctx, insertReviewQuery, params.ID, params.OrderID, params.GigID, params.Content, params.BuyerID, params.BuyerUsername, params.SellerID, params.SellerUsername, params.Rating).Scan(&row.ID, &row.OrderID, &row.GigID, &row.Content, &row.BuyerID, &row.BuyerUsername, &row.SellerID, &row.SellerUsername, &row.Rating, &row.CreatedAt, &row.UpdatedAt); err != nil {
 		status = "error"
 		return nil, r.translator.TranslateCreateReviewError(err)
 	}
@@ -80,7 +80,7 @@ func (r *repo) GetByID(ctx context.Context, reviewID string) (*domain.Review, er
 	defer func() { metrics.Global().ObserveDB("yugabyte", "get_by_id", "reviews", status, time.Since(started)) }()
 
 	var row model.ReviewRow
-	if err := r.db.QueryRowContext(ctx, selectReviewByIDQuery, reviewID).Scan(&row.ID, &row.OrderID, &row.GigID, &row.Content, &row.BuyerID, &row.SellerID, &row.Rating, &row.CreatedAt, &row.UpdatedAt); err != nil {
+	if err := r.db.QueryRowContext(ctx, selectReviewByIDQuery, reviewID).Scan(&row.ID, &row.OrderID, &row.GigID, &row.Content, &row.BuyerID, &row.BuyerUsername, &row.SellerID, &row.SellerUsername, &row.Rating, &row.CreatedAt, &row.UpdatedAt); err != nil {
 		status = "error"
 		return nil, r.translator.TranslateFindReviewError(err)
 	}
@@ -95,11 +95,30 @@ func (r *repo) GetByOrderID(ctx context.Context, orderID string) (*domain.Review
 	}()
 
 	var row model.ReviewRow
-	if err := r.db.QueryRowContext(ctx, selectReviewByOrderIDQuery, orderID).Scan(&row.ID, &row.OrderID, &row.GigID, &row.Content, &row.BuyerID, &row.SellerID, &row.Rating, &row.CreatedAt, &row.UpdatedAt); err != nil {
+	if err := r.db.QueryRowContext(ctx, selectReviewByOrderIDQuery, orderID).Scan(&row.ID, &row.OrderID, &row.GigID, &row.Content, &row.BuyerID, &row.BuyerUsername, &row.SellerID, &row.SellerUsername, &row.Rating, &row.CreatedAt, &row.UpdatedAt); err != nil {
 		status = "error"
 		return nil, r.translator.TranslateFindReviewError(err)
 	}
 	return mapper.MapReviewRowToDomain(row), nil
+}
+
+func (r *repo) GetSellerIDByUsername(ctx context.Context, username string) (string, error) {
+	started := time.Now()
+	status := "success"
+	defer func() {
+		metrics.Global().ObserveDB("yugabyte", "get_seller_id_by_username", "reviews", status, time.Since(started))
+	}()
+
+	var sellerID sql.NullString
+	if err := r.db.QueryRowContext(ctx, selectSellerIDByUsernameQuery, strings.TrimSpace(username)).Scan(&sellerID); err != nil {
+		status = "error"
+		return "", r.translator.TranslateFindReviewError(err)
+	}
+	if !sellerID.Valid || strings.TrimSpace(sellerID.String) == "" {
+		status = "error"
+		return "", AnnotateDomainError(domain.ErrReviewNotFound, sql.ErrNoRows)
+	}
+	return strings.TrimSpace(sellerID.String), nil
 }
 
 func (r *repo) ListByGigID(ctx context.Context, query domain.ListReviewsQuery) (*domain.ListReviewsResult, error) {

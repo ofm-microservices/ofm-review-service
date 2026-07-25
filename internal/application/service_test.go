@@ -32,6 +32,9 @@ func (fakeReviewRepo) ListByGigID(context.Context, domain.ListReviewsQuery) (*do
 func (fakeReviewRepo) ListBySellerID(context.Context, domain.ListReviewsQuery) (*domain.ListReviewsResult, error) {
 	return nil, errors.New("unexpected call")
 }
+func (fakeReviewRepo) GetSellerIDByUsername(context.Context, string) (string, error) {
+	return "", domain.ErrReviewNotFound
+}
 func (fakeReviewRepo) GetGigRatingSummary(context.Context, string) (*domain.RatingSummary, error) {
 	return nil, errors.New("unexpected call")
 }
@@ -64,6 +67,9 @@ func (r *fakeReadRepo) GetSellerRatingSummary(context.Context, string) (*domain.
 func (r *fakeReadRepo) GetSellerRatingSummaryByUsername(context.Context, string) (*domain.RatingSummary, error) {
 	return nil, errors.New("unexpected call")
 }
+func (r *fakeReadRepo) GetSellerIDByUsername(context.Context, string) (string, error) {
+	return "", domain.ErrReviewNotFound
+}
 func (r *fakeReadRepo) SetGigRating(context.Context, string, domain.RatingSummary) error {
 	return nil
 }
@@ -71,6 +77,9 @@ func (r *fakeReadRepo) SetSellerRating(context.Context, string, domain.RatingSum
 	return nil
 }
 func (r *fakeReadRepo) SetSellerRatingByUsername(context.Context, string, domain.RatingSummary) error {
+	return nil
+}
+func (r *fakeReadRepo) SetSellerIDByUsername(context.Context, string, string) error {
 	return nil
 }
 func (r *fakeReadRepo) ListByGigID(context.Context, domain.ListReviewsQuery) (*domain.ListReviewsResult, error) {

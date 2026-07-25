@@ -47,11 +47,12 @@ func (c *client) GetOrderLifecycleSnapshot(ctx context.Context, orderID string) 
 		return &app.OrderLifecycleSnapshot{}, nil
 	}
 	return &app.OrderLifecycleSnapshot{
-		OrderID: order.GetOrderId(),
-		BuyerID: order.GetBuyerUserId(),
-		GigID:   order.GetGigId(),
-		SellerID: order.GetSellerUserId(),
-		Status:  order.GetStatus(),
+		OrderID:        order.GetOrderId(),
+		BuyerID:        order.GetBuyerUserId(),
+		GigID:          order.GetGigId(),
+		SellerID:       order.GetSellerUserId(),
+		SellerUsername: order.GetSellerUsername(),
+		Status:         order.GetStatus(),
 	}, nil
 }
 
