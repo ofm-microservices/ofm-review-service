@@ -15,6 +15,7 @@ type Config struct {
 	Metrics MetricsConfig
 	Tracing TracingConfig
 	Redis   RedisConfig
+	Kafka   KafkaConfig
 	NATS    NATSConfig
 }
 

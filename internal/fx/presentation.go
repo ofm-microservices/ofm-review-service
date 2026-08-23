@@ -3,6 +3,7 @@ package appfx
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"review-service/config"
 	app "review-service/internal/application"
@@ -10,7 +11,7 @@ import (
 	grpcclient "review-service/internal/infra/order/grpc"
 	usergrpc "review-service/internal/infra/user/grpc"
 	eventbroker "review-service/internal/presentation/event_broker"
-	pubnats "review-service/internal/presentation/event_broker/nats"
+	pubkafka "review-service/internal/presentation/event_broker/kafka"
 	grpcserver "review-service/internal/presentation/grpc"
 
 	"go.uber.org/fx"
@@ -42,14 +43,14 @@ func ProvideUserPreviewClient(cfg *config.Config, lg logging.Logger) (app.UserPr
 	return usergrpc.New(cfg.User.Address, lg)
 }
 
-// ProvideEventBroker constructs the NATS publisher used by review-service.
-func ProvideEventBroker(cfg *config.Config, lg logging.Logger) (eventbroker.EventBroker, error) {
-	return pubnats.NewBroker(cfg.NATS, lg)
+// ProvideEventBroker constructs the Kafka publisher used by review-service.
+func ProvideEventBroker(cfg *config.Config, db *sqlx.DB, lg logging.Logger) (eventbroker.EventBroker, error) {
+	return pubkafka.NewBrokerWithDB(cfg.Kafka, db)
 }
 
 // ProvideReviewPublisher constructs the review lifecycle publisher.
 func ProvideReviewPublisher(broker eventbroker.EventBroker, cfg *config.Config) app.ReviewPublisher {
-	return pubnats.NewReviewPublisher(broker, cfg)
+	return pubkafka.NewReviewPublisher(broker, cfg)
 }
 
 // ProvideReviewProjectionSubscriber constructs the asynchronous read-model repair subscriber.
@@ -61,8 +62,8 @@ func ProvideReviewProjectionSubscriber(
 	userPreview app.UserPreviewClient,
 	cfg *config.Config,
 	lg logging.Logger,
-) (*pubnats.ReviewProjectionSubscriber, error) {
-	return pubnats.NewReviewProjectionSubscriber(broker, service, readRepo, coord, userPreview, cfg, lg)
+) (*pubkafka.ReviewProjectionSubscriber, error) {
+	return pubkafka.NewReviewProjectionSubscriber(broker, service, readRepo, coord, userPreview, cfg, lg)
 }
 
 // ProvideGRPCServer constructs the gRPC server exposed by review-service.

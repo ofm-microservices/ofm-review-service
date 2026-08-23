@@ -91,7 +91,7 @@ func (s *server) CreateReview(ctx context.Context, req *reviewv1.CreateReviewReq
 		RequestedAt:    req.GetRequestedAt(),
 	})
 	if err != nil {
-		log.Error("create review failed",
+		log.Warn("create review returned a business condition",
 			logging.Operation("grpc.review.create"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -113,6 +113,7 @@ func (s *server) CreateReview(ctx context.Context, req *reviewv1.CreateReviewReq
 		case errors.Is(err, domain.ErrReviewNotCompleted):
 			return nil, status.Error(codes.FailedPrecondition, err.Error())
 		default:
+			log.Error("create review failed internally", logging.Err(err))
 			return nil, status.Error(codes.Internal, "internal server error")
 		}
 	}
@@ -129,7 +130,7 @@ func (s *server) ListGigReviews(ctx context.Context, req *reviewv1.ListGigReview
 		Cursor: req.GetCursor(),
 	})
 	if err != nil {
-		log.Error("list gig reviews failed",
+		log.Warn("list gig reviews returned a business condition",
 			logging.Operation("grpc.review.list_gig"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -140,6 +141,7 @@ func (s *server) ListGigReviews(ctx context.Context, req *reviewv1.ListGigReview
 		if errors.Is(err, domain.ErrInvalidGigID) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		log.Error("list gig reviews failed internally", logging.Err(err))
 		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
@@ -162,7 +164,7 @@ func (s *server) ListSellerReviews(ctx context.Context, req *reviewv1.ListSeller
 		Cursor:   req.GetCursor(),
 	})
 	if err != nil {
-		log.Error("list seller reviews failed",
+		log.Warn("list seller reviews returned a business condition",
 			logging.Operation("grpc.review.list_seller"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -173,6 +175,7 @@ func (s *server) ListSellerReviews(ctx context.Context, req *reviewv1.ListSeller
 		if errors.Is(err, domain.ErrInvalidSellerID) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		log.Error("list seller reviews failed internally", logging.Err(err))
 		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
@@ -192,17 +195,21 @@ func (s *server) GetReviewsBySellerUsername(ctx context.Context, req *reviewv1.G
 	log := logging.WithContext(ctx, s.log)
 	res, err := s.svc.GetReviewsBySellerUsername(ctx, req.GetUsername(), req.GetCursor())
 	if err != nil {
-		log.Error("get reviews by seller username failed",
-			logging.Operation("grpc.review.get_reviews_by_seller_username"),
-			logging.Attempt(1),
-			logging.Retryable(false),
-			logging.DurationMS(time.Since(started)),
-			logging.String("username", req.GetUsername()),
-			logging.Err(err),
-		)
-		if errors.Is(err, domain.ErrInvalidUsername) {
+		if errors.Is(err, domain.ErrInvalidUsername) || errors.Is(err, domain.ErrReviewNotFound) {
+			log.Warn("get reviews by seller username returned a business condition",
+				logging.Operation("grpc.review.get_reviews_by_seller_username"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("username", req.GetUsername()),
+				logging.Err(err),
+			)
+			if errors.Is(err, domain.ErrReviewNotFound) {
+				return nil, status.Error(codes.NotFound, err.Error())
+			}
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		log.Error("get reviews by seller username failed internally", logging.Err(err))
 		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
@@ -222,20 +229,29 @@ func (s *server) GetGigRatingSummary(ctx context.Context, req *reviewv1.GetGigRa
 	log := logging.WithContext(ctx, s.log)
 	res, err := s.svc.GetGigRatingSummary(ctx, req.GetGigId())
 	if err != nil {
-		log.Error("get gig rating summary failed",
-			logging.Operation("grpc.review.get_gig_rating_summary"),
-			logging.Attempt(1),
-			logging.Retryable(false),
-			logging.DurationMS(time.Since(started)),
-			logging.String("gig_id", req.GetGigId()),
-			logging.Err(err),
-		)
 		if errors.Is(err, domain.ErrInvalidGigID) {
+			log.Warn("get gig rating summary returned a business condition",
+				logging.Operation("grpc.review.get_gig_rating_summary"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("gig_id", req.GetGigId()),
+				logging.Err(err),
+			)
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		if errors.Is(err, domain.ErrReviewNotFound) {
+			log.Warn("get gig rating summary returned a business condition",
+				logging.Operation("grpc.review.get_gig_rating_summary"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("gig_id", req.GetGigId()),
+				logging.Err(err),
+			)
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
+		log.Error("get gig rating summary failed internally", logging.Err(err))
 		return nil, status.Error(codes.Internal, "internal server error")
 	}
 	return s.mapper.ToRatingSummaryProto(res), nil
@@ -246,14 +262,22 @@ func (s *server) GetUserRatingSummaryByUsername(ctx context.Context, req *review
 	log := logging.WithContext(ctx, s.log)
 	res, err := s.svc.GetUserRatingSummaryByUsername(ctx, req.GetUsername())
 	if err != nil {
-		log.Error("get user rating summary by username failed",
-			logging.Operation("grpc.review.get_user_rating_summary_by_username"),
-			logging.Attempt(1),
-			logging.Retryable(false),
-			logging.DurationMS(time.Since(started)),
-			logging.String("username", req.GetUsername()),
-			logging.Err(err),
-		)
+		if errors.Is(err, domain.ErrInvalidUsername) || errors.Is(err, domain.ErrReviewNotFound) {
+			log.Warn("user rating summary returned a business condition",
+				logging.Operation("grpc.review.get_user_rating_summary_by_username"),
+				logging.String("username", req.GetUsername()),
+				logging.Err(err),
+			)
+		} else {
+			log.Error("get user rating summary by username failed",
+				logging.Operation("grpc.review.get_user_rating_summary_by_username"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("username", req.GetUsername()),
+				logging.Err(err),
+			)
+		}
 		if errors.Is(err, domain.ErrInvalidUsername) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
