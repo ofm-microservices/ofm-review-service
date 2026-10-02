@@ -2,6 +2,7 @@ package appfx
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
@@ -25,13 +26,49 @@ var PresentationModule = fx.Options(
 		ProvideUserPreviewClient,
 		ProvideReviewPublisher,
 		ProvideReviewProjectionSubscriber,
+		ProvideRecoverySubscriber,
 		grpcserver.NewReviewMapper,
 		ProvideGRPCServer,
 	),
 	fx.Invoke(
 		InvokeRunGRPCServer,
+		InvokeSubscribeRecovery,
 	),
 )
+
+// ProvideRecoverySubscriber constructs the review-owned migration consumer.
+func ProvideRecoverySubscriber(b eventbroker.EventBroker, svc app.ReviewService, cfg *config.Config, lg logging.Logger) (pubkafka.RecoverySubscriber, error) {
+	return pubkafka.NewRecoverySubscriber(b, svc, cfg.Kafka, lg)
+}
+
+// InvokeSubscribeRecovery starts review recovery consumption during startup.
+func InvokeSubscribeRecovery(lc fx.Lifecycle, sub pubkafka.RecoverySubscriber, lg logging.Logger) {
+	var cancel context.CancelFunc
+	lc.Append(fx.Hook{OnStart: func(context.Context) error {
+		ctx, stop := context.WithCancel(context.Background())
+		cancel = stop
+		go func() {
+			for ctx.Err() == nil {
+				if err := sub.Subscribe(ctx); err != nil && ctx.Err() == nil {
+					lg.Error("review recovery consumer stopped; retrying", logging.Err(err))
+					timer := time.NewTimer(time.Second)
+					select {
+					case <-ctx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+				}
+			}
+		}()
+		return nil
+	}, OnStop: func(context.Context) error {
+		if cancel != nil {
+			cancel()
+		}
+		return nil
+	}})
+}
 
 // ProvideOrderLookupClient constructs the outbound order-service lookup client.
 func ProvideOrderLookupClient(cfg *config.Config, lg logging.Logger) (app.OrderLookupClient, error) {

@@ -57,6 +57,12 @@ type ReviewPublisher interface {
 	PublishSellerRatingRequested(ctx context.Context, review *domain.Review) error
 }
 
+// ReviewRealtimePublisher emits client-visible outcomes after the review
+// write has committed; projection internals remain on their own topics.
+type ReviewRealtimePublisher interface {
+	PublishReviewNotification(ctx context.Context, review *domain.Review, eventType string) error
+}
+
 // RatingBootstrapper warms the rating read model before event consumers start.
 type RatingBootstrapper interface {
 	Preload(ctx context.Context) error
@@ -102,6 +108,7 @@ type UserPreview struct {
 
 // CreateReviewCommand is the application input for a new review.
 type CreateReviewCommand struct {
+	ReviewID       string
 	OrderID        string
 	BuyerID        string
 	BuyerUsername  string
