@@ -9,7 +9,7 @@ completed order snapshot.
 
 Current responsibilities:
 
-- persist review data in YugabyteDB
+- persist review data in PostgreSQL
 - project read-model data to Redis
 - expose the buyer review write RPC
 
@@ -43,15 +43,15 @@ LOG_LEVEL=info
 
 DB_HOST=127.0.0.1
 DB_PORT=5433
-DB_USER=yugabyte
-DB_PASSWORD=yugabyte
+DB_USER=postgres
+DB_PASSWORD=postgres
 DB_NAME=review_service
 DB_SSLMODE=disable
 DB_MAX_OPEN_CONNS=20
 DB_MAX_IDLE_CONNS=10
 DB_CONN_MAX_LIFETIME=5m
 
-MIGRATIONS_PATH=file://migration/yugabyte
+MIGRATIONS_PATH=file://migration/postgres
 MIGRATIONS_TABLE=schema_migrations_review_service
 
 REDIS_HOST=127.0.0.1
@@ -101,7 +101,7 @@ NATS_SAGA_ADAPTIVE_HIGH_MAX_WAIT=2ms
 Core runtime:
 
 - Go
-- YugabyteDB for the write model
+- PostgreSQL for the write model
 - Redis for the review read model
 - NATS JetStream for saga command/result transport
 - Uber Fx for wiring
@@ -122,10 +122,10 @@ Main libraries from `go.mod`:
 
 - `internal/domain` defines review entities and domain errors
 - `internal/application` owns review use cases
-- `internal/infra/write/yugabyte` owns write-side persistence
+- `internal/infra/write/postgres` owns write-side persistence
 - `internal/infra/read/redis` owns the read model
 - `internal/presentation/grpc` owns the review write RPC
-- `migration/yugabyte` contains schema migrations
+- `migration/postgres` contains schema migrations
 
 This service should not own auth fields such as password hashes or verification
 codes. It owns review data only.

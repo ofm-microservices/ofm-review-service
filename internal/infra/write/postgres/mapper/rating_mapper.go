@@ -2,7 +2,7 @@ package mapper
 
 import (
 	domain "review-service/internal/domain"
-	"review-service/internal/infra/write/yugabyte/model"
+	"review-service/internal/infra/write/postgres/model"
 )
 
 // MapRatingSummaryRowToDomain maps a grouped rating row into the shared

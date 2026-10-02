@@ -2,11 +2,11 @@ package mapper
 
 import (
 	domain "review-service/internal/domain"
-	"review-service/internal/infra/write/yugabyte/model"
-	"review-service/internal/infra/write/yugabyte/nullstring"
+	"review-service/internal/infra/write/postgres/model"
+	"review-service/internal/infra/write/postgres/nullstring"
 )
 
-// MapReviewRowToDomain maps the Yugabyte row to the review domain entity.
+// MapReviewRowToDomain maps the PostgreSQL row to the review domain entity.
 func MapReviewRowToDomain(row model.ReviewRow) *domain.Review {
 	conv := nullstring.New()
 	return &domain.Review{
