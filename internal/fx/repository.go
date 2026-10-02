@@ -3,7 +3,7 @@ package appfx
 import (
 	domain "review-service/internal/domain"
 	readrepo "review-service/internal/infra/read/redis"
-	writerepo "review-service/internal/infra/write/yugabyte"
+	writerepo "review-service/internal/infra/write/postgres"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
@@ -20,7 +20,7 @@ var RepoModule = fx.Options(
 	),
 )
 
-// ProvideWriteRepo constructs the Yugabyte-backed review repository.
+// ProvideWriteRepo constructs the PostgreSQL-backed review repository.
 func ProvideWriteRepo(dbx *sqlx.DB, translator writerepo.DBErrorTranslator, lg logging.Logger) (domain.ReviewRepository, error) {
 	return writerepo.New(dbx, translator, lg)
 }

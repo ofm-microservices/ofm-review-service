@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// ReviewRow is the Yugabyte persistence model for the review write model.
+// ReviewRow is the PostgreSQL persistence model for the review write model.
 type ReviewRow struct {
 	ID             string         `db:"review_id"`
 	OrderID        string         `db:"order_id"`

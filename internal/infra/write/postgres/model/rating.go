@@ -1,6 +1,6 @@
 package model
 
-// RatingSummaryRow is the grouped Yugabyte row used to seed a gig or seller
+// RatingSummaryRow is the grouped PostgreSQL row used to seed a gig or seller
 // rating summary into Redis.
 type RatingSummaryRow struct {
 	OwnerID      string  `db:"owner_id"`
