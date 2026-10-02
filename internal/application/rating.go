@@ -10,7 +10,7 @@ import (
 )
 
 // GetGigRatingSummary returns the gig rating summary from Redis or loads it
-// from the canonical YugabyteDB read if the cache is empty.
+// from the canonical PostgreSQL read if the cache is empty.
 func (s *reviewService) GetGigRatingSummary(ctx context.Context, gigID string) (*domain.RatingSummary, error) {
 	gigID = strings.TrimSpace(gigID)
 	if gigID == "" {
@@ -41,7 +41,7 @@ func (s *reviewService) GetGigRatingSummary(ctx context.Context, gigID string) (
 
 // GetUserRatingSummaryByUsername returns the user rating summary from Redis or
 // resolves the seller's canonical identifier from user-service before
-// falling back to YugabyteDB.
+// falling back to PostgreSQL.
 func (s *reviewService) GetUserRatingSummaryByUsername(ctx context.Context, username string) (*domain.RatingSummary, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {

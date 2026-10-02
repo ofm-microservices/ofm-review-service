@@ -40,7 +40,7 @@ func NewRatingBootstrapper(repo domain.ReviewRepository, readRepo domain.ReviewR
 }
 
 // Preload seeds Redis with the full gig and seller rating summaries from the
-// canonical YugabyteDB read model.
+// canonical PostgreSQL read model.
 func (b *ratingBootstrapper) Preload(ctx context.Context) error {
 	gigSummaries, err := b.repo.ListGigRatingSummaries(ctx)
 	if err != nil {
