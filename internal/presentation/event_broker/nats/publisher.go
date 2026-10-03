@@ -40,10 +40,10 @@ type eventBroker interface {
 func NewReviewPublisher(broker eventBroker, cfg *config.Config) app.ReviewPublisher {
 	return &ReviewPublisher{
 		broker:       broker,
-		gig:          cfg.NATS.ReviewGigProjectionSubject,
-		user:         cfg.NATS.ReviewUserProjectionSubject,
-		gigRating:    cfg.NATS.ReviewGigRatingSubject,
-		sellerRating: cfg.NATS.ReviewSellerRatingSubject,
+		gig:          cfg.Kafka.ReviewGigProjectionSubject,
+		user:         cfg.Kafka.ReviewUserProjectionSubject,
+		gigRating:    cfg.Kafka.ReviewGigRatingSubject,
+		sellerRating: cfg.Kafka.ReviewSellerRatingSubject,
 	}
 }
 

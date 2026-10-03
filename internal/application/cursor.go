@@ -68,7 +68,7 @@ func (s ReviewCursorState) Next(lastScore int64, lastID string, pagesPerWindow i
 	return s
 }
 
-// DBCursor returns the canonical cursor used for the YugabyteDB read path.
+// DBCursor returns the canonical cursor used for the PostgreSQL read path.
 func (s ReviewCursorState) DBCursor() string {
 	if s.LastScore == 0 && strings.TrimSpace(s.LastID) == "" {
 		return ""

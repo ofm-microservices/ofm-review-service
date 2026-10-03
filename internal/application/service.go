@@ -102,9 +102,12 @@ func (s *reviewService) CreateReview(ctx context.Context, cmd CreateReviewComman
 		}
 	}
 
-	reviewID, err := uuid.NewV7()
+	reviewID, err := uuid.Parse(strings.TrimSpace(cmd.ReviewID))
 	if err != nil {
-		return nil, err
+		reviewID, err = uuid.NewV7()
+		if err != nil {
+			return nil, err
+		}
 	}
 	review, err := s.repo.Create(ctx, domain.CreateReviewParams{
 		ID:             reviewID.String(),
@@ -166,6 +169,15 @@ func (s *reviewService) CreateReview(ctx context.Context, cmd CreateReviewComman
 			logging.String("order_id", review.OrderID),
 			logging.Err(err),
 		)
+	}
+	if notifier, ok := s.pub.(ReviewRealtimePublisher); ok {
+		if err := notifier.PublishReviewNotification(ctx, review, "review.accepted"); err != nil {
+			s.log.Error("review realtime notification publish failed",
+				logging.Operation("review.accepted"),
+				logging.String("review_id", review.ID),
+				logging.Err(err),
+			)
+		}
 	}
 	s.log.Info("review projection and rating requested events published",
 		logging.Operation("review.create"),

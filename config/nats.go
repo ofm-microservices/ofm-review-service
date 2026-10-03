@@ -5,7 +5,9 @@ import "time"
 // NATSConfig defines NATS streams, subjects, and pull-consumer settings used
 // by review-service.
 type NATSConfig struct {
-	URL                           string        `env:"NATS_URL,required"`
+	// URL remains only for compatibility adapters and is not required by the
+	// Kafka production path.
+	URL                           string        `env:"NATS_URL"`
 	Review                        string        `env:"NATS_USER"`
 	Password                      string        `env:"NATS_PASSWORD"`
 	ReviewEventsStream            string        `env:"NATS_STREAM_REVIEW_EVENTS" envDefault:"REVIEW_EVENTS"`

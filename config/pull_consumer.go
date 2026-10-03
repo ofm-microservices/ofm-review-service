@@ -5,6 +5,9 @@ import "time"
 // PullConsumerConfig defines the runtime settings for a single NATS pull
 // consumer.
 type PullConsumerConfig struct {
+	// GroupID selects the Kafka consumer group when this configuration is used
+	// by the Kafka adapter; NATS consumers ignore it.
+	GroupID       string
 	Stream        string
 	Subject       string
 	Durable       string

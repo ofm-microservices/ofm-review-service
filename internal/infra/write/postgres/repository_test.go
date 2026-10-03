@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"review-service/internal/infra/write/yugabyte/model"
+	"review-service/internal/infra/write/postgres/model"
 )
 
 func TestEncodeDecodeReviewCursor(t *testing.T) {

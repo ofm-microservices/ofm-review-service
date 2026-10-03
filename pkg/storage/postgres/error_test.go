@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestAnnotateYugabyteErrorHelpers(t *testing.T) {
+func TestAnnotatePostgreSQLErrorHelpers(t *testing.T) {
 	base := errors.New("boom")
 	if AnnotateResolveMigrationsPathError(base) == nil {
 		t.Fatalf("expected resolve annotation")

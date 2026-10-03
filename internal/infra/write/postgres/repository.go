@@ -9,8 +9,8 @@ import (
 	"time"
 
 	domain "review-service/internal/domain"
-	"review-service/internal/infra/write/yugabyte/mapper"
-	"review-service/internal/infra/write/yugabyte/model"
+	"review-service/internal/infra/write/postgres/mapper"
+	"review-service/internal/infra/write/postgres/model"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
@@ -23,10 +23,10 @@ type repo struct {
 	log        logging.Logger
 }
 
-// New constructs the Yugabyte-backed review repository.
+// New constructs the PostgreSQL-backed review repository.
 func New(db *sqlx.DB, translator DBErrorTranslator, log logging.Logger) (domain.ReviewRepository, error) {
 	if db == nil {
-		return nil, ErrNilYugaByteDB
+		return nil, ErrNilPostgresDB
 	}
 	if translator == nil {
 		return nil, ErrNilDBErrorTranslator
@@ -34,13 +34,13 @@ func New(db *sqlx.DB, translator DBErrorTranslator, log logging.Logger) (domain.
 	if log == nil {
 		return nil, ErrNilLogger
 	}
-	return &repo{db: db, translator: translator, log: log.With(logging.String("module", "yugabyte-repository"))}, nil
+	return &repo{db: db, translator: translator, log: log.With(logging.String("module", "postgres-repository"))}, nil
 }
 
 func (r *repo) Create(ctx context.Context, params domain.CreateReviewParams) (*domain.Review, error) {
 	started := time.Now()
 	status := "success"
-	defer func() { metrics.Global().ObserveDB("yugabyte", "create", "reviews", status, time.Since(started)) }()
+	defer func() { metrics.Global().ObserveDB("postgres", "create", "reviews", status, time.Since(started)) }()
 
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -77,7 +77,7 @@ func (r *repo) Create(ctx context.Context, params domain.CreateReviewParams) (*d
 func (r *repo) GetByID(ctx context.Context, reviewID string) (*domain.Review, error) {
 	started := time.Now()
 	status := "success"
-	defer func() { metrics.Global().ObserveDB("yugabyte", "get_by_id", "reviews", status, time.Since(started)) }()
+	defer func() { metrics.Global().ObserveDB("postgres", "get_by_id", "reviews", status, time.Since(started)) }()
 
 	var row model.ReviewRow
 	if err := r.db.QueryRowContext(ctx, selectReviewByIDQuery, reviewID).Scan(&row.ID, &row.OrderID, &row.GigID, &row.Content, &row.BuyerID, &row.BuyerUsername, &row.SellerID, &row.SellerUsername, &row.Rating, &row.CreatedAt, &row.UpdatedAt); err != nil {
@@ -91,7 +91,7 @@ func (r *repo) GetByOrderID(ctx context.Context, orderID string) (*domain.Review
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "get_by_order_id", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "get_by_order_id", "reviews", status, time.Since(started))
 	}()
 
 	var row model.ReviewRow
@@ -106,7 +106,7 @@ func (r *repo) GetSellerIDByUsername(ctx context.Context, username string) (stri
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "get_seller_id_by_username", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "get_seller_id_by_username", "reviews", status, time.Since(started))
 	}()
 
 	var sellerID sql.NullString
@@ -125,7 +125,7 @@ func (r *repo) ListByGigID(ctx context.Context, query domain.ListReviewsQuery) (
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "list_by_gig_id", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "list_by_gig_id", "reviews", status, time.Since(started))
 	}()
 	return r.ListByIndex(ctx, selectReviewsByGigIDQuery, selectReviewsByGigIDCursorQuery, query.GigID, query.Cursor, query.Limit)
 }
@@ -134,7 +134,7 @@ func (r *repo) ListBySellerID(ctx context.Context, query domain.ListReviewsQuery
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "list_by_seller_id", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "list_by_seller_id", "reviews", status, time.Since(started))
 	}()
 	return r.ListByIndex(ctx, selectReviewsBySellerIDQuery, selectReviewsBySellerIDCursorQuery, query.SellerID, query.Cursor, query.Limit)
 }
@@ -143,7 +143,7 @@ func (r *repo) GetGigRatingSummary(ctx context.Context, gigID string) (*domain.R
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "get_gig_rating_summary", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "get_gig_rating_summary", "reviews", status, time.Since(started))
 	}()
 
 	var avg float64
@@ -163,7 +163,7 @@ func (r *repo) GetSellerRatingSummary(ctx context.Context, sellerID string) (*do
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "get_seller_rating_summary", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "get_seller_rating_summary", "reviews", status, time.Since(started))
 	}()
 
 	var avg float64
@@ -183,7 +183,7 @@ func (r *repo) ListGigRatingSummaries(ctx context.Context) ([]domain.GigRatingSu
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "list_gig_rating_summaries", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "list_gig_rating_summaries", "reviews", status, time.Since(started))
 	}()
 
 	var rows []model.RatingSummaryRow
@@ -198,7 +198,7 @@ func (r *repo) ListSellerRatingSummaries(ctx context.Context) ([]domain.SellerRa
 	started := time.Now()
 	status := "success"
 	defer func() {
-		metrics.Global().ObserveDB("yugabyte", "list_seller_rating_summaries", "reviews", status, time.Since(started))
+		metrics.Global().ObserveDB("postgres", "list_seller_rating_summaries", "reviews", status, time.Since(started))
 	}()
 
 	var rows []model.RatingSummaryRow
@@ -212,7 +212,7 @@ func (r *repo) ListSellerRatingSummaries(ctx context.Context) ([]domain.SellerRa
 func (r *repo) DeleteByID(ctx context.Context, reviewID string) error {
 	started := time.Now()
 	status := "success"
-	defer func() { metrics.Global().ObserveDB("yugabyte", "delete_by_id", "reviews", status, time.Since(started)) }()
+	defer func() { metrics.Global().ObserveDB("postgres", "delete_by_id", "reviews", status, time.Since(started)) }()
 
 	if _, err := r.db.ExecContext(ctx, deleteReviewByIDQuery, reviewID); err != nil {
 		status = "error"
